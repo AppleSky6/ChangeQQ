@@ -5,6 +5,9 @@
 #include <iostream>
 #include "windows.h"
 
+#pragma comment(lib,"Advapi32.lib")
+#pragma comment(lib,"Shell32.lib")
+
 // 好友防撤回偏移 bytes_reserved
 /*	
 	83C4 20 | add esp, 20 
@@ -68,31 +71,40 @@ int BinaryFind(const unsigned char * Dest, int DestLen,
 	return -1;		// 未找到返回-1
 }
 
+BOOL read_path(const char* REGPath, char* strPath)//读取注册表
+{
+	HKEY hKEY;//定义有关的键，在查询结束时关闭  
+	DWORD dwSize = 256;
+	DWORD dwType = REG_SZ;
 
-int main(int argc, char *argv[])
+	//访问注册表，hKEY则保存此函数所打开的键的句柄  
+	if (ERROR_SUCCESS == ::RegOpenKeyExA(HKEY_LOCAL_MACHINE, REGPath, 0, KEY_READ, &hKEY))
+	{
+
+
+		if (RegQueryValueExA(hKEY, "Install", 0, &dwType, (LPBYTE)strPath, &dwSize) != ERROR_SUCCESS)
+		{
+			RegCloseKey(hKEY);
+			printf("[Dbg]：Get QQ path error \n");
+			return FALSE;
+		}
+		::RegCloseKey(hKEY);
+		return TRUE;
+	}
+	printf("[Dbg]：Get QQ path error \n");
+	return FALSE;
+}
+
+BOOL path_qq(HANDLE hFILE)//path qq
 {
 	DWORD dwFileSize = NULL;
-	HANDLE hFILE = NULL;
 	byte* byQQBuf = nullptr;
 	DWORD reserved_address = NULL;
 	DWORD userdef_address = NULL;
 	DWORD dwWrite = NULL;
 
-	do 
+	do
 	{
-		if (!strstr(argv[1], "IM.dll"))
-		{
-			printf("[Dbg]：INVALID QQ File,Please open IM.dll\n");
-			break;
-		}
-
-		hFILE = CreateFileA(argv[1], GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		if (hFILE == INVALID_HANDLE_VALUE)
-		{
-			printf("[Dbg]：CreateFile error\n");
-			return 0;
-		}
-
 		dwFileSize = GetFileSize(hFILE, NULL);
 		if (dwFileSize == NULL)
 		{
@@ -153,10 +165,63 @@ int main(int argc, char *argv[])
 			break;
 		}
 		printf("[Dbg]：change IM.dll success\n");
-		break;
+		delete byQQBuf;
+		return TRUE;
+
 	} while (TRUE);
 
-	CloseHandle(hFILE);
+	delete byQQBuf;
+	return FALSE;
+}
+
+
+int main(int argc, char *argv[])
+{
+	const char* QQREGPath = "SOFTWARE\\Tencent\\QQ2009";
+	const char* TIMREGPath = "SOFTWARE\\Tencent\\TIM";
+
+	char QQPath[MAX_PATH] = { 0 };
+	char TIMPath[MAX_PATH] = { 0 };
+
+	HANDLE hFILE = NULL;
+
+	
+	
+
+	if (read_path(QQREGPath, QQPath))//读取QQ注册表
+	{
+		ShellExecuteA(NULL, "open", "taskkill.exe", "/im QQ.exe", NULL, SW_HIDE);
+
+		strcat_s(QQPath, "\\Bin\\IM.dll");
+		hFILE = CreateFileA(QQPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (hFILE == INVALID_HANDLE_VALUE)
+		{
+			printf("[Dbg]：CreateFile QQ error\n");
+		}
+		else
+		{
+			path_qq(hFILE);
+			CloseHandle(hFILE);
+		}
+	}
+
+	if (read_path(TIMREGPath, TIMPath))//读取TIM注册表
+	{
+		ShellExecuteA(NULL, "open", "taskkill.exe", "/im TIM.exe", NULL, SW_HIDE);
+
+		strcat_s(TIMPath, "\\Bin\\IM.dll");
+		hFILE = CreateFileA(TIMPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (hFILE == INVALID_HANDLE_VALUE)
+		{
+			printf("[Dbg]：CreateFile TIM error\n");
+		}
+		else
+		{
+			path_qq(hFILE);
+			CloseHandle(hFILE);
+		}
+	}
+
 	return 0;
 }
 
